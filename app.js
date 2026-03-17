@@ -338,7 +338,12 @@ async function postToGAS(body) {
   try {
     const response = await fetch(GAS_URL, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      // Content-Type: application/json はブラウザに CORS プリフライト (OPTIONS) を
+      // 送らせてしまい、GAS が OPTIONS に対応していないため TypeError になる。
+      // text/plain にすることで「単純リクエスト」として扱われ、プリフライトが発生しなくなる。
+      // GAS 側の parseRequestBody は e.postData.contents を JSON.parse するので
+      // Content-Type が text/plain でも問題なく受け取れる。
+      headers: { "Content-Type": "text/plain" },
       body:    JSON.stringify(body),
       signal:  controller.signal,
     });
