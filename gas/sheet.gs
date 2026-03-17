@@ -257,19 +257,20 @@ function findTodayOpenAttendanceRow(sheet, name, todayStr) {
 
   for (let i = 0; i < values.length; i++) {
     const row         = values[i];
-    const rowDate     = String(row[COL_DATE      - 1]); // A列（配列は 0 始まり）
+    const rawDate     =        row[COL_DATE      - 1];  // A列: stringify 前に instanceof Date を確認する
     const rowName     = String(row[COL_NAME      - 1]); // C列: 氏名で照合する
     const rowClockOut =        row[COL_CLOCK_OUT - 1];  // E列
 
-    // スプレッドシートから読んだ日付は Date オブジェクトになることがあるため
-    // formatDateJST で統一した文字列に変換してから比較する
-    const rowDateStr = (rowDate instanceof Date || (!rowDate.startsWith("20")))
-      ? formatDateJST(new Date(rowDate))
-      : rowDate.slice(0, 10).replace(/-/g, "/"); // "2026-03-17" → "2026/03/17"
+    // Sheets の日付セルは Date オブジェクトを返すことがある。
+    // 先に String() すると "Mon Mar 17 2026..." という非解析文字列になるため
+    // 必ず raw 値で instanceof チェックをしてから変換する。
+    const rowDateStr = rawDate instanceof Date
+      ? formatDateJST(rawDate)
+      : String(rawDate).slice(0, 10).replace(/-/g, "/"); // "2026-03-17" or "2026/03/17" → "2026/03/17"
 
     const isToday         = rowDateStr === todayStr;
     const isSamePerson    = rowName    === name;      // ← 氏名で照合
-    const isClockOutEmpty = rowClockOut === "" || rowClockOut === null;
+    const isClockOutEmpty = rowClockOut === "" || rowClockOut === null || rowClockOut === 0;
 
     if (isToday && isSamePerson && isClockOutEmpty) {
       // sheet.getRange の行番号は 1 始まり、かつヘッダー行を除いているので +2
