@@ -229,19 +229,23 @@ function updateTraineeStatus(spreadsheetId, employeeId, status) {
 // =====================================================
 
 /**
- * 打刻記録シートから「当日かつ退勤時刻が未入力」の行番号を探して返す。
+ * 打刻記録シートから「当日・同氏名・退勤時刻が未入力」の行番号を探して返す。
  *
  * clockOut（退勤打刻）のときに使う。
  * 当日の出勤レコードがあって、かつ退勤時刻（E列）が空の行 = 退勤待ちの行。
  *
+ * ※ 以前は B列（employeeId）で照合していたが、全員が同じ employeeId("user01")
+ *   を持つ運用では別の人の行が誤って更新されてしまう。
+ *   氏名（C列）で照合することで「その人の行だけ」を正しく更新できる。
+ *
  * 見つからなかった場合は null を返す（呼び出し側でエラーを返す）。
  *
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet  打刻記録シート
- * @param {string} employeeId  研修生ID
- * @param {string} todayStr    今日の日付文字列 "YYYY/MM/DD"
+ * @param {string} name     氏名（C列の値と照合する）
+ * @param {string} todayStr 今日の日付文字列 "YYYY/MM/DD"
  * @returns {number|null}  見つかった行番号（1 始まり）または null
  */
-function findTodayOpenAttendanceRow(sheet, employeeId, todayStr) {
+function findTodayOpenAttendanceRow(sheet, name, todayStr) {
   const lastRow = sheet.getLastRow();
 
   // データが 1 行もない（ヘッダーのみ）場合は即 null
@@ -253,27 +257,77 @@ function findTodayOpenAttendanceRow(sheet, employeeId, todayStr) {
 
   for (let i = 0; i < values.length; i++) {
     const row         = values[i];
-    const rowDate     = String(row[COL_DATE        - 1]); // A列（配列は 0 始まり）
-    const rowEmpId    = String(row[COL_EMPLOYEE_ID - 1]); // B列
-    const rowClockOut =        row[COL_CLOCK_OUT   - 1];  // E列
+    const rowDate     = String(row[COL_DATE      - 1]); // A列（配列は 0 始まり）
+    const rowName     = String(row[COL_NAME      - 1]); // C列: 氏名で照合する
+    const rowClockOut =        row[COL_CLOCK_OUT - 1];  // E列
 
     // スプレッドシートから読んだ日付は Date オブジェクトになることがあるため
     // formatDateJST で統一した文字列に変換してから比較する
-    const rowDateStr = rowDate.startsWith("20")
-      ? rowDate.slice(0, 10).replace(/-/g, "/") // "2026-03-17" → "2026/03/17"
-      : formatDateJST(new Date(rowDate));
+    const rowDateStr = (rowDate instanceof Date || (!rowDate.startsWith("20")))
+      ? formatDateJST(new Date(rowDate))
+      : rowDate.slice(0, 10).replace(/-/g, "/"); // "2026-03-17" → "2026/03/17"
 
-    const isToday         = rowDateStr  === todayStr;
-    const isSameEmployee  = rowEmpId    === employeeId;
+    const isToday         = rowDateStr === todayStr;
+    const isSamePerson    = rowName    === name;      // ← 氏名で照合
     const isClockOutEmpty = rowClockOut === "" || rowClockOut === null;
 
-    if (isToday && isSameEmployee && isClockOutEmpty) {
+    if (isToday && isSamePerson && isClockOutEmpty) {
       // sheet.getRange の行番号は 1 始まり、かつヘッダー行を除いているので +2
       return i + 2;
     }
   }
 
   return null; // 対象行なし
+}
+
+/**
+ * 当日の打刻状態（出勤時刻・退勤時刻）を氏名で検索して返す。
+ *
+ * getStatus アクション（状態確認 API）から呼ばれる。
+ * 氏名入力後に「今日すでに出勤しているか」をフロントエンドが確認するために使う。
+ *
+ * @param {string} spreadsheetId
+ * @param {string} name      氏名
+ * @returns {{ clockInTime: string|null, clockOutTime: string|null }}
+ */
+function getTodayStatusByName(spreadsheetId, name) {
+  const sheet    = getSheet(spreadsheetId, SHEET_NAME_ATTENDANCE);
+  const todayStr = formatDateJST(now());
+  const lastRow  = sheet.getLastRow();
+
+  if (lastRow < 2) return { clockInTime: null, clockOutTime: null };
+
+  const values = sheet.getRange(2, 1, lastRow - 1, COL_CLOCK_OUT).getValues();
+
+  // 最新の行を優先するため、末尾から検索する
+  for (let i = values.length - 1; i >= 0; i--) {
+    const row     = values[i];
+    const rowDate = row[COL_DATE - 1];
+    const rowName = String(row[COL_NAME - 1]);
+
+    // 日付を文字列に統一して比較
+    const rowDateStr = (rowDate instanceof Date)
+      ? formatDateJST(rowDate)
+      : String(rowDate).startsWith("20")
+        ? String(rowDate).slice(0, 10).replace(/-/g, "/")
+        : formatDateJST(new Date(rowDate));
+
+    if (rowDateStr !== todayStr || rowName !== name) continue;
+
+    // 一致した行の出勤・退勤時刻を取得する
+    // getValue() は時刻を Date オブジェクトで返すことがあるので formatTimeJST で変換
+    const inRaw  = row[COL_CLOCK_IN  - 1];
+    const outRaw = row[COL_CLOCK_OUT - 1];
+
+    const clockInTime  = inRaw  instanceof Date ? formatTimeJST(inRaw)
+                       : (inRaw  && String(inRaw).trim())  ? String(inRaw).trim()  : null;
+    const clockOutTime = outRaw instanceof Date ? formatTimeJST(outRaw)
+                       : (outRaw && String(outRaw).trim()) ? String(outRaw).trim() : null;
+
+    return { clockInTime, clockOutTime };
+  }
+
+  return { clockInTime: null, clockOutTime: null }; // 当日の打刻なし
 }
 
 /**
@@ -323,8 +377,8 @@ function updateAttendanceClockOut(spreadsheetId, data, clockOutDate) {
   const todayStr     = formatDateJST(clockOutDate);
   const clockOutTime = formatTimeJST(clockOutDate);
 
-  // 当日・同研修生・退勤未入力の行を検索
-  const targetRow = findTodayOpenAttendanceRow(sheet, data.employeeId, todayStr);
+  // 当日・同氏名・退勤未入力の行を検索（氏名で照合することで他人の行を誤更新しない）
+  const targetRow = findTodayOpenAttendanceRow(sheet, data.name, todayStr);
 
   if (!targetRow) {
     // 出勤レコードが存在しないか、すでに退勤済み
@@ -332,11 +386,20 @@ function updateAttendanceClockOut(spreadsheetId, data, clockOutDate) {
   }
 
   // D列（打刻時刻 = 出勤時刻）を取得して勤務時間を計算する
-  const clockInTime = sheet.getRange(targetRow, COL_CLOCK_IN).getValue();
-  const workMinutes = calcWorkMinutes(String(clockInTime), clockOutTime);
+  //
+  // ※ getValue() はスプレッドシートが "09:00" を時刻型に変換した場合に
+  //   Date オブジェクト（例: Mon Dec 30 1899 09:00:00 GMT+0900）を返す。
+  //   String(Date) は長い日付文字列になり calcWorkMinutes が NaN を返すため、
+  //   必ず Utilities.formatDate で "HH:mm" 文字列に変換してから渡す。
+  const clockInRaw  = sheet.getRange(targetRow, COL_CLOCK_IN).getValue();
+  const clockInTime = (clockInRaw instanceof Date)
+    ? Utilities.formatDate(clockInRaw, "Asia/Tokyo", "HH:mm")
+    : String(clockInRaw).trim();
 
-  if (workMinutes <= 0) {
-    throw new Error("退勤時刻が出勤時刻より前になっています。時刻を確認してください。");
+  const workMinutes = calcWorkMinutes(clockInTime, clockOutTime);
+
+  if (isNaN(workMinutes) || workMinutes <= 0) {
+    throw new Error("退勤時刻が出勤時刻より前になっています（または時刻の読み取りに失敗しました）。");
   }
 
   // E列（退勤時刻）と F列（勤務時間）を書き込む

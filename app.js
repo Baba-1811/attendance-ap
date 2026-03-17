@@ -262,6 +262,9 @@ function updateClock() {
 /** トーストの自動消去用タイマー ID。複数重なりを防ぐために保持する */
 let toastTimerId = null;
 
+/** サーバー状態確認のデバウンスタイマー ID */
+let statusCheckTimer = null;
+
 /**
  * トースト通知を表示する
  * @param {string} message   表示するメッセージ
@@ -512,7 +515,45 @@ async function handleClockOut() {
 }
 
 /* ============================================================
-   12. 課題完了報告
+   12. サーバーから当日の打刻状態を取得する
+   ============================================================ */
+
+/**
+ * GAS の getStatus エンドポイントを呼んで当日の打刻状態を取得し
+ * state / localStorage / UI に反映する。
+ *
+ * 用途: 氏名入力後にサーバー側の実態を確認することで
+ *       「別デバイスで打刻済みなのに出勤ボタンが有効になっている」
+ *       状況を防ぐ。
+ *
+ * 失敗時はサイレントに無視する（トースト表示しない）。
+ * 打刻操作自体に支障はないため、UX を乱さないようにする。
+ */
+async function checkStatusFromServer() {
+  const name = state.name.trim();
+  if (!name) return; // 氏名が空なら何もしない
+
+  try {
+    const result = await postToGAS({
+      action:     "getStatus",
+      employeeId: EMPLOYEE_ID,
+      name:       name,
+    });
+
+    if (result.status === "ok") {
+      state.clockIn  = result.clockInTime  || null;
+      state.clockOut = result.clockOutTime || null;
+      saveState();
+      updateUI();
+    }
+  } catch (err) {
+    // 通信失敗はサイレントに無視する（打刻操作に影響させない）
+    console.warn("状態確認に失敗しました:", err.message);
+  }
+}
+
+/* ============================================================
+   13. 課題完了報告
    ============================================================ */
 
 /**
@@ -551,6 +592,13 @@ function handleNameInput() {
   const hasUrl  = elements.appUrlInput.value.trim().length > 0;
   const hasName = state.name.trim() !== "";
   elements.btnReport.disabled = !hasUrl || !hasName;
+
+  // 500ms 後にサーバーから当日の打刻状態を取得して UI を補正する
+  // 入力中は何度もリクエストしないようにデバウンスする
+  if (statusCheckTimer) clearTimeout(statusCheckTimer);
+  if (state.name.trim()) {
+    statusCheckTimer = setTimeout(checkStatusFromServer, 500);
+  }
 }
 
 /**
@@ -625,7 +673,7 @@ async function handleCompleteTask() {
 }
 
 /* ============================================================
-   13. イベントリスナーの登録
+   14. イベントリスナーの登録
    ============================================================ */
 
 /**
@@ -648,7 +696,7 @@ function registerEventListeners() {
 }
 
 /* ============================================================
-   14. 初期化
+   15. 初期化
    ページ読み込み時に一度だけ実行する
    ============================================================ */
 
@@ -678,10 +726,16 @@ function init() {
 
   // 7. Service Worker を登録 (PWA 対応)
   registerServiceWorker();
+
+  // 8. 氏名が復元されていればサーバーから当日の打刻状態を取得して UI を補正する
+  //    （別デバイスで打刻した場合など、localStorage と実態がずれているケースに対応）
+  if (state.name.trim()) {
+    checkStatusFromServer();
+  }
 }
 
 /* ============================================================
-   15. Service Worker の登録 (PWA)
+   16. Service Worker の登録 (PWA)
    ============================================================ */
 
 /**
@@ -704,7 +758,7 @@ function registerServiceWorker() {
 }
 
 /* ============================================================
-   16. エントリーポイント
+   17. エントリーポイント
    DOM の読み込み完了後に init() を呼ぶ
    ============================================================ */
 

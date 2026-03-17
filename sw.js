@@ -13,7 +13,7 @@
  *   ファイルを更新したら v1 → v2 のようにインクリメントする
  */
 
-const CACHE_NAME = "attendance-app-v3"; // handleNameInput の打刻リセット修正に合わせてバージョンアップ
+const CACHE_NAME = "attendance-app-v4"; // checkStatusFromServer 追加・init 時サーバー状態確認に合わせてバージョンアップ
 
 /**
  * キャッシュ対象のファイル一覧

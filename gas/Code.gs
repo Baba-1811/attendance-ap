@@ -57,6 +57,10 @@ function doPost(e) {
       return handleCompleteTask(body);
     }
 
+    if (action === "getStatus") {
+      return handleGetStatus(body);
+    }
+
     // 未知の action は 400 相当のエラーを返す
     return createJsonResponse("error", `不明な action です: ${action}`);
 
@@ -203,7 +207,48 @@ function handleCompleteTask(body) {
 }
 
 // =====================================================
-// 5. バリデーション
+// 5. action ハンドラ — 当日打刻状態の確認
+// =====================================================
+
+/**
+ * 氏名をキーに当日の打刻状態をスプレッドシートから取得して返す。
+ *
+ * フロントエンドが氏名入力後に呼び出し、
+ * 「すでに出勤済みか」「退勤済みか」をサーバー側の実態に基づいて確認するために使う。
+ * これにより別デバイスで打刻した場合でも正しい状態が反映される。
+ *
+ * レスポンス例:
+ *   { status: "ok", clockInTime: "09:00", clockOutTime: null }   // 出勤済み・退勤待ち
+ *   { status: "ok", clockInTime: "09:00", clockOutTime: "18:00" } // 退勤済み
+ *   { status: "ok", clockInTime: null,    clockOutTime: null }   // 未出勤
+ *
+ * @param {{ employeeId: string, name: string }} body
+ * @returns {GoogleAppsScript.Content.TextOutput}
+ */
+function handleGetStatus(body) {
+  // 氏名の空欄チェック
+  if (!body.name || body.name.trim() === "") {
+    return createJsonResponse("error", "氏名が指定されていません");
+  }
+
+  const props  = getScriptProperties();
+  const result = getTodayStatusByName(props.spreadsheetId, body.name.trim());
+
+  // createJsonResponse は status / message の 2 フィールドしか持てないため
+  // 追加データ（clockInTime / clockOutTime）を含む JSON を直接組み立てて返す
+  const payload = JSON.stringify({
+    status:       "ok",
+    message:      "状態を取得しました",
+    clockInTime:  result.clockInTime,
+    clockOutTime: result.clockOutTime,
+  });
+  return ContentService
+    .createTextOutput(payload)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =====================================================
+// 6. バリデーション
 // =====================================================
 
 /**
