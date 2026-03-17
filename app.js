@@ -517,14 +517,35 @@ async function handleClockOut() {
 
 /**
  * 氏名入力欄に変化があったときの処理
- * state.name を更新し、localStorage に保存し、ボタン状態を再評価する
+ * state.name を更新し、localStorage に保存し、ボタン状態と画面を再評価する
+ *
+ * 【重要】氏名が変わったら打刻状態（clockIn/clockOut）をリセットする
+ *
+ * なぜリセットが必要か:
+ *   state は { name, clockIn, clockOut } をまとめて1件保持する構造のため、
+ *   「Aさんの出勤済み state」が残った状態で Bさんが名前を入力すると
+ *   「Bさんの名前 + Aさんの打刻状態」という矛盾が生じ、両ボタンが disabled のまま
+ *   新規出勤できなくなる。氏名が変わった時点で打刻状態を白紙に戻すことで
+ *   この不整合を防ぐ。
  */
 function handleNameInput() {
-  state.name = elements.nameInput.value;
-  saveState(); // 氏名も state の一部として保存する（saveName は廃止）
+  const prevName = state.name;           // 変更前の氏名（比較に使う）
+  const newName  = elements.nameInput.value;
 
-  // 打刻ボタンの有効/無効を再計算
-  renderButtons();
+  state.name = newName;
+
+  // 氏名が変わった かつ 打刻状態が残っている場合はリセットする
+  // （前の人の clockIn/clockOut を次の人に引き継がせない）
+  if (newName.trim() !== prevName.trim() &&
+      (state.clockIn !== null || state.clockOut !== null)) {
+    state.clockIn  = null;
+    state.clockOut = null;
+  }
+
+  saveState(); // name / clockIn / clockOut をまとめて保存
+
+  // 打刻ボタン + ステータス表示を再描画（clockIn/clockOut がリセットされた場合に退勤表示も消える）
+  updateUI();
 
   // 送信ボタンも「氏名 AND URL 入力あり」でのみ有効にする
   const hasUrl  = elements.appUrlInput.value.trim().length > 0;

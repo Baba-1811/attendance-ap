@@ -13,7 +13,7 @@
  *   ファイルを更新したら v1 → v2 のようにインクリメントする
  */
 
-const CACHE_NAME = "attendance-app-v2"; // app.js の localStorage 修正に合わせてバージョンアップ
+const CACHE_NAME = "attendance-app-v3"; // handleNameInput の打刻リセット修正に合わせてバージョンアップ
 
 /**
  * キャッシュ対象のファイル一覧
