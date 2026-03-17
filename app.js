@@ -20,7 +20,7 @@
  * デプロイ後に発行される URL をここに貼り付ける
  * 例: "https://script.google.com/macros/s/XXXX/exec"
  */
-const GAS_URL = "https://script.google.com/macros/s/AKfycby0vl4KjbGTcDTmQBdw9i0xpLnNawgvKL1o2WU4fLYEGQQ6SGwQ4E_BDUCIWMgfGk8M/exec";
+const GAS_URL = "AKfycby0vl4KjbGTcDTmQBdw9i0xpLnNawgvKL1o2WU4fLYEGQQ6SGwQ4E_BDUCIWMgfGk8M";
 
 /**
  * 研修生情報
