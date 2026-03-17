@@ -13,6 +13,9 @@
     <!-- iOS Safari でホーム画面追加したときのアイコン指定 -->
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
+    <!-- PWA: ブラウザのテーマカラー（アドレスバーや通知バーの色） -->
+    <meta name="theme-color" content="#2196f3" />
+
     <!-- スタイルシート読み込み -->
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -41,12 +44,6 @@
 
         <!-- 出勤・退勤・勤務時間の情報行 -->
         <div class="status-area__records">
-
-          <!-- 出勤時刻: 出勤打刻後に表示する (初期は非表示) -->
-          <div class="record-item record-item--in hidden" id="js-record-in">
-            <span class="record-item__label">出勤</span>
-            <span class="record-item__value" id="js-clock-in-time">--:--</span>
-          </div>
 
           <!-- 退勤時刻: 退勤打刻後に表示する (初期は非表示) -->
           <div class="record-item record-item--out hidden" id="js-record-out">

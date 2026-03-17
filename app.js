@@ -56,10 +56,8 @@ const elements = {
   date:           document.getElementById("js-date"),
   // ステータスエリア
   clock:          document.getElementById("js-clock"),
-  recordIn:       document.getElementById("js-record-in"),
   recordOut:      document.getElementById("js-record-out"),
   recordDuration: document.getElementById("js-record-duration"),
-  clockInTime:    document.getElementById("js-clock-in-time"),
   clockOutTime:   document.getElementById("js-clock-out-time"),
   workDuration:   document.getElementById("js-work-duration"),
   // 氏名入力欄
@@ -216,14 +214,6 @@ function renderNameInput() {
  * ステータスエリアの出勤・退勤・勤務時間表示を state に合わせて更新する
  */
 function renderStatus() {
-  // --- 出勤時刻の表示 ---
-  if (state.clockIn) {
-    elements.clockInTime.textContent = state.clockIn;
-    elements.recordIn.classList.remove("hidden");
-  } else {
-    elements.recordIn.classList.add("hidden");
-  }
-
   // --- 退勤時刻の表示 ---
   if (state.clockOut) {
     elements.clockOutTime.textContent = state.clockOut;

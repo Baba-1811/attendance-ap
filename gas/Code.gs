@@ -93,21 +93,12 @@ function handleClockIn(body) {
   // スクリプトプロパティを取得（設定漏れがあれば例外が投げられ doPost の catch に渡る）
   const props = getScriptProperties();
 
-  // --- ステップ 2: 研修生マスタの存在確認・名前照合 ---
-  // フロントから送られた employeeId と name が、マスタに登録済みかどうかを確認する
-  const masterError = validateTraineeMaster(props.spreadsheetId, body.employeeId, body.name);
-  if (masterError) return createJsonResponse("error", masterError);
-
-  // --- ステップ 3: 打刻記録に出勤レコードを追記 ---
+  // --- ステップ 2: 打刻記録に出勤レコードを追記 ---
+  // 氏名はフロントの入力欄から受け取った値をそのまま記録する（マスタ照合なし）
   const clockInDate             = now(); // 打刻時刻は GAS サーバー側の時刻を使う
   const { clockInTime }         = appendAttendanceRow(props.spreadsheetId, body, clockInDate);
 
-  // --- ステップ 4: 研修生マスタのステータスを「出勤中」に更新 ---
-  // 打刻記録への書き込みが成功した後に行う
-  // 失敗してもログに残すだけで打刻は取り消さない（updateTraineeStatus 内で吸収）
-  updateTraineeStatus(props.spreadsheetId, body.employeeId, "出勤中");
-
-  // --- ステップ 5: LINE 通知（失敗しても打刻記録には影響しない）---
+  // --- ステップ 3: LINE 通知（失敗しても打刻記録には影響しない）---
   const lineMessage = buildClockInMessage({
     name:        body.name,
     clockInTime: clockInTime,
@@ -119,7 +110,7 @@ function handleClockIn(body) {
 }
 
 // =====================================================
-// 3. action ハンドラ — 退勤打刻
+// 3. action ハンドラ ― 退勤打刻
 // =====================================================
 
 /**
@@ -143,19 +134,13 @@ function handleClockOut(body) {
 
   const props = getScriptProperties();
 
-  // --- ステップ 2: 研修生マスタの存在確認・名前照合 ---
-  const masterError = validateTraineeMaster(props.spreadsheetId, body.employeeId, body.name);
-  if (masterError) return createJsonResponse("error", masterError);
-
-  // --- ステップ 3: 打刻記録の当日行に退勤時刻・勤務時間を書き込む ---
+  // --- ステップ 2: 打刻記録の当日行に退勤時刻・勤務時間を書き込む ---
+  // 氏名はフロントの入力欄から受け取った値をそのまま使う（マスタ照合なし）
   // 出勤レコードなし / 退勤済み / 退勤が出勤より前 の場合は例外が投げられる
   const clockOutDate = now();
   const result       = updateAttendanceClockOut(props.spreadsheetId, body, clockOutDate);
 
-  // --- ステップ 4: 研修生マスタのステータスを「退勤済み」に更新 ---
-  updateTraineeStatus(props.spreadsheetId, body.employeeId, "退勤済み");
-
-  // --- ステップ 5: LINE 通知 ---
+  // --- ステップ 3: LINE 通知 ---
   const lineMessage = buildClockOutMessage({
     name:         body.name,
     clockInTime:  result.clockInTime,
@@ -201,15 +186,12 @@ function handleCompleteTask(body) {
 
   const props = getScriptProperties();
 
-  // --- ステップ 2: 研修生マスタの存在確認・名前照合 ---
-  const masterError = validateTraineeMaster(props.spreadsheetId, body.employeeId, body.name);
-  if (masterError) return createJsonResponse("error", masterError);
-
-  // --- ステップ 3: 課題完了記録シートに追記 ---
+  // --- ステップ 2: 課題完了記録シートに追記 ---
+  // 氏名はフロントの入力欄から受け取った値をそのまま記録する（マスタ照合なし）
   const reportDate         = now();
   const { reportedAt }     = appendTaskRow(props.spreadsheetId, body, reportDate);
 
-  // --- ステップ 4: LINE 通知 ---
+  // --- ステップ 3: LINE 通知 ---
   const lineMessage = buildCompleteTaskMessage({
     name:       body.name,
     appUrl:     body.appUrl.trim(),

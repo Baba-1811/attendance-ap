@@ -173,8 +173,7 @@ body {
 }
 
 /* 色分け */
-.record-item--in  .record-item__value { color: var(--color-in); }
-.record-item--out .record-item__value { color: var(--color-out); }
+.record-item--out      .record-item__value { color: var(--color-out); }
 .record-item--duration .record-item__value { color: var(--color-primary); }
 
 /* ============================================================
