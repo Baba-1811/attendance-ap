@@ -42,9 +42,9 @@ const TOAST_DURATION_MS = 3000;
 /**
  * localStorage のキー名
  * 他のサイトのデータと衝突しないようにアプリ名を prefix にする
+ * 氏名・打刻状態をまとめて1つのキーで管理する（分けると不整合が起きる）
  */
-const STORAGE_KEY      = "attendance_app_state"; // 当日の打刻状態 (日付またぎでリセット)
-const STORAGE_KEY_NAME = "attendance_app_name";  // 氏名 (日付をまたいでも保持する)
+const STORAGE_KEY = "attendance_app_state";
 
 /* ============================================================
    1. DOM 要素の取得
@@ -114,13 +114,17 @@ function getTodayString() {
 }
 
 /**
- * state を localStorage に保存する
+ * state（氏名・打刻状態）を localStorage にまとめて保存する
+ *
+ * name / clockIn / clockOut をひとつのオブジェクトで保存することで、
+ * 「氏名だけ消える」「打刻状態だけ残る」という不整合を防ぐ。
  * プライベートブラウジングでは例外が出るので try-catch で囲む
  */
 function saveState() {
   try {
     const data = {
       date:     getTodayString(),
+      name:     state.name,     // ← 氏名も一緒に保存する
       clockIn:  state.clockIn,
       clockOut: state.clockOut,
     };
@@ -132,34 +136,11 @@ function saveState() {
 }
 
 /**
- * 氏名を localStorage に保存する
- * 氏名は日付をまたいでも保持する（STORAGE_KEY_NAME を使う）
- * @param {string} name
- */
-function saveName(name) {
-  try {
-    localStorage.setItem(STORAGE_KEY_NAME, name);
-  } catch (e) {
-    console.warn("氏名の保存に失敗しました:", e);
-  }
-}
-
-/**
- * localStorage から氏名を読み込む
- * @returns {string} 保存されていなければ空文字
- */
-function loadName() {
-  try {
-    return localStorage.getItem(STORAGE_KEY_NAME) ?? "";
-  } catch (e) {
-    console.warn("氏名の読み込みに失敗しました:", e);
-    return "";
-  }
-}
-
-/**
  * localStorage から state を読み込む
- * 保存されている日付が今日と違う場合はリセットする（日付またぎ対策）
+ *
+ * 日付が今日と一致する場合: name / clockIn / clockOut をすべて復元する
+ * 日付が変わっている場合 : 打刻状態（clockIn/clockOut）はリセットするが
+ *                          氏名だけは引き継ぐ（毎朝また入力しなくて済むため）
  */
 function loadState() {
   try {
@@ -168,13 +149,16 @@ function loadState() {
 
     const data = JSON.parse(raw);
 
-    // 保存された日付と今日を比較し、違えば古いデータなので使わない
+    // 氏名は日付に関係なく引き継ぐ
+    state.name = data.name ?? "";
+
+    // 保存された日付と今日を比較し、違えば打刻状態はリセットする
     if (data.date !== getTodayString()) {
       localStorage.removeItem(STORAGE_KEY);
-      return;
+      return; // clockIn / clockOut は初期値 null のまま
     }
 
-    // 今日のデータがあれば state に反映する
+    // 今日のデータがあれば打刻状態も復元する
     state.clockIn  = data.clockIn  ?? null;
     state.clockOut = data.clockOut ?? null;
   } catch (e) {
@@ -537,7 +521,7 @@ async function handleClockOut() {
  */
 function handleNameInput() {
   state.name = elements.nameInput.value;
-  saveName(state.name);
+  saveState(); // 氏名も state の一部として保存する（saveName は廃止）
 
   // 打刻ボタンの有効/無効を再計算
   renderButtons();
@@ -651,11 +635,11 @@ function registerEventListeners() {
  * アプリの初期化処理
  */
 function init() {
-  // 1. localStorage から当日の打刻状態を復元
+  // 1. localStorage から打刻状態と氏名をまとめて復元する
+  //    （name / clockIn / clockOut が1つのキーで保存されているため不整合が起きない）
   loadState();
 
-  // 2. localStorage から氏名を復元して state と入力欄に反映
-  state.name = loadName();
+  // 2. 復元した state.name を氏名入力欄に反映する
   renderNameInput();
 
   // 3. 日付をヘッダーに表示
