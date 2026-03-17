@@ -23,15 +23,10 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycby0vl4KjbGTcDTmQBdw9i0xpLnNawgvKL1o2WU4fLYEGQQ6SGwQ4E_BDUCIWMgfGk8M/exec";
 
 /**
- * 研修生情報
- * GAS の研修生マスタシートに登録されている値と完全に一致させる必要がある。
- * 実際の運用では認証機能と組み合わせて動的に取得するのが望ましいが、
- * 今回は学習用に定数として定義する。
- *
- * ※ 変更した場合は研修生マスタの登録値も合わせて確認すること。
+ * 研修生 ID
+ * GAS の研修生マスタシートの A列 (employeeId) と完全に一致させる必要がある。
  */
-const EMPLOYEE_ID   = "user01"; // 研修生マスタ A列の値と一致させる
-const EMPLOYEE_NAME = "馬場翔太郎"; // 研修生マスタ B列の値と一致させる（旧: "馬場翔太郎"）
+const EMPLOYEE_ID = "user01";
 
 /**
  * fetch のタイムアウト時間 (ミリ秒)
@@ -48,7 +43,8 @@ const TOAST_DURATION_MS = 3000;
  * localStorage のキー名
  * 他のサイトのデータと衝突しないようにアプリ名を prefix にする
  */
-const STORAGE_KEY = "attendance_app_state";
+const STORAGE_KEY      = "attendance_app_state"; // 当日の打刻状態 (日付またぎでリセット)
+const STORAGE_KEY_NAME = "attendance_app_name";  // 氏名 (日付をまたいでも保持する)
 
 /* ============================================================
    1. DOM 要素の取得
@@ -66,6 +62,8 @@ const elements = {
   clockInTime:    document.getElementById("js-clock-in-time"),
   clockOutTime:   document.getElementById("js-clock-out-time"),
   workDuration:   document.getElementById("js-work-duration"),
+  // 氏名入力欄
+  nameInput:      document.getElementById("js-name-input"),
   // 打刻ボタン
   btnClockIn:     document.getElementById("js-btn-clock-in"),
   btnClockOut:    document.getElementById("js-btn-clock-out"),
@@ -88,13 +86,15 @@ const elements = {
 /**
  * アプリの状態を保持するオブジェクト
  * @type {{
- *   clockIn: string | null,   出勤時刻 (HH:MM) または null
+ *   clockIn:  string | null,  出勤時刻 (HH:MM) または null
  *   clockOut: string | null,  退勤時刻 (HH:MM) または null
+ *   name:     string,         氏名 (入力欄と同期する)
  * }}
  */
 let state = {
   clockIn:  null,
   clockOut: null,
+  name:     "",
 };
 
 /* ============================================================
@@ -134,6 +134,32 @@ function saveState() {
 }
 
 /**
+ * 氏名を localStorage に保存する
+ * 氏名は日付をまたいでも保持する（STORAGE_KEY_NAME を使う）
+ * @param {string} name
+ */
+function saveName(name) {
+  try {
+    localStorage.setItem(STORAGE_KEY_NAME, name);
+  } catch (e) {
+    console.warn("氏名の保存に失敗しました:", e);
+  }
+}
+
+/**
+ * localStorage から氏名を読み込む
+ * @returns {string} 保存されていなければ空文字
+ */
+function loadName() {
+  try {
+    return localStorage.getItem(STORAGE_KEY_NAME) ?? "";
+  } catch (e) {
+    console.warn("氏名の読み込みに失敗しました:", e);
+    return "";
+  }
+}
+
+/**
  * localStorage から state を読み込む
  * 保存されている日付が今日と違う場合はリセットする（日付またぎ対策）
  */
@@ -165,16 +191,25 @@ function loadState() {
 
 /**
  * ヘッダーの日付表示を更新する
- * 例: "2026年3月17日（火）"
+ * 例: "2026年3月17日(火)"
+ * ※ 全角括弧ではなく半角括弧 () を使う
  */
 function renderDate() {
   const now  = new Date();
   const days = ["日", "月", "火", "水", "木", "金", "土"];
   const y    = now.getFullYear();
-  const m    = now.getMonth() + 1;
+  const m    = now.getMonth() + 1; // getMonth() は 0 始まりなので +1
   const d    = now.getDate();
   const day  = days[now.getDay()];
-  elements.date.textContent = `${y}年${m}月${d}日（${day}）`;
+  elements.date.textContent = `${y}年${m}月${d}日(${day})`;
+}
+
+/**
+ * 氏名入力欄を state.name の値で初期化する
+ * ページ読み込み時に localStorage から復元した氏名を反映する
+ */
+function renderNameInput() {
+  elements.nameInput.value = state.name;
 }
 
 /**
@@ -211,12 +246,14 @@ function renderStatus() {
 
 /**
  * ボタンの有効/無効を state に合わせて切り替える
+ * 氏名が空のときはすべての打刻ボタンを無効にする
  */
 function renderButtons() {
-  // 出勤ボタン: 出勤打刻済みなら無効
-  elements.btnClockIn.disabled  = state.clockIn  !== null;
-  // 退勤ボタン: 出勤前 または 退勤済みなら無効
-  elements.btnClockOut.disabled = state.clockIn === null || state.clockOut !== null;
+  const hasName = state.name.trim() !== "";
+  // 出勤ボタン: 氏名未入力 または 出勤打刻済みなら無効
+  elements.btnClockIn.disabled  = !hasName || state.clockIn !== null;
+  // 退勤ボタン: 氏名未入力 または 出勤前 または 退勤済みなら無効
+  elements.btnClockOut.disabled = !hasName || state.clockIn === null || state.clockOut !== null;
 }
 
 /**
@@ -403,6 +440,13 @@ function getCurrentTimestamp() {
  * 出勤ボタンが押されたときの処理
  */
 async function handleClockIn() {
+  // 氏名の取得と空欄チェック（renderButtons でボタンを無効にしているが念のため二重チェック）
+  const name = elements.nameInput.value.trim();
+  if (!name) {
+    showToast("氏名を入力してください", "error");
+    return;
+  }
+
   // 確認ダイアログ
   if (!window.confirm("出勤を打刻しますか？")) return;
 
@@ -414,7 +458,7 @@ async function handleClockIn() {
     const body = {
       action:     "clockIn",
       employeeId: EMPLOYEE_ID,
-      name:       EMPLOYEE_NAME,
+      name:       name,            // 氏名入力欄から取得
       timestamp:  getCurrentTimestamp(),
     };
 
@@ -450,6 +494,13 @@ async function handleClockIn() {
  * 退勤ボタンが押されたときの処理
  */
 async function handleClockOut() {
+  // 氏名の取得と空欄チェック
+  const name = elements.nameInput.value.trim();
+  if (!name) {
+    showToast("氏名を入力してください", "error");
+    return;
+  }
+
   if (!window.confirm("退勤を打刻しますか？")) return;
 
   setButtonLoading(elements.btnClockOut);
@@ -458,7 +509,7 @@ async function handleClockOut() {
     const body = {
       action:     "clockOut",
       employeeId: EMPLOYEE_ID,
-      name:       EMPLOYEE_NAME,
+      name:       name,            // 氏名入力欄から取得
       timestamp:  getCurrentTimestamp(),
     };
 
@@ -486,6 +537,23 @@ async function handleClockOut() {
    ============================================================ */
 
 /**
+ * 氏名入力欄に変化があったときの処理
+ * state.name を更新し、localStorage に保存し、ボタン状態を再評価する
+ */
+function handleNameInput() {
+  state.name = elements.nameInput.value;
+  saveName(state.name);
+
+  // 打刻ボタンの有効/無効を再計算
+  renderButtons();
+
+  // 送信ボタンも「氏名 AND URL 入力あり」でのみ有効にする
+  const hasUrl  = elements.appUrlInput.value.trim().length > 0;
+  const hasName = state.name.trim() !== "";
+  elements.btnReport.disabled = !hasUrl || !hasName;
+}
+
+/**
  * アプリ URL 入力欄の変化に合わせて文字数カウンターと送信ボタンを更新する
  * ※ 関数名は旧 handleTaskInput から handleAppUrlInput に変更
  */
@@ -493,8 +561,9 @@ function handleAppUrlInput() {
   const len = elements.appUrlInput.value.length;
   elements.charCount.textContent = len;
 
-  // 1 文字以上入力されていれば送信ボタンを有効にする
-  elements.btnReport.disabled = len === 0;
+  // URL が 1 文字以上 かつ 氏名が入力済みのときだけ送信ボタンを有効にする
+  const hasName = state.name.trim() !== "";
+  elements.btnReport.disabled = len === 0 || !hasName;
 }
 
 /**
@@ -503,13 +572,20 @@ function handleAppUrlInput() {
  * ※ GAS の action: "completeTask" に対応
  */
 async function handleCompleteTask() {
+  // 氏名の取得と空欄チェック
+  const name = elements.nameInput.value.trim();
+  if (!name) {
+    showToast("氏名を入力してください", "error");
+    return;
+  }
+
   // 入力値を取得して前後の空白を除く
   const appUrl = elements.appUrlInput.value.trim();
 
   // --- バリデーション ---
   // 空欄チェック（HTML の required と二重で守る）
   if (!appUrl) {
-    showToast("アプリURLを入力してください", "error"); // 旧: "課題名を入力してください"
+    showToast("アプリURLを入力してください", "error");
     return;
   }
 
@@ -518,17 +594,17 @@ async function handleCompleteTask() {
   try {
     // GAS へ送るデータを組み立てる
     const body = {
-      action:     "completeTask",   // 旧: "report"
+      action:     "completeTask",
       employeeId: EMPLOYEE_ID,
-      name:       EMPLOYEE_NAME,
-      appUrl:     appUrl,           // 旧: task: task
+      name:       name,            // 氏名入力欄から取得
+      appUrl:     appUrl,
       timestamp:  getCurrentTimestamp(),
     };
 
     const result = await postToGAS(body);
 
     if (result.status === "ok") {
-      // 成功: フォームをリセット
+      // 成功: フォームをリセット (氏名欄はリセットしない)
       elements.appUrlInput.value     = "";
       elements.charCount.textContent = "0";
       elements.btnReport.disabled    = true;
@@ -541,8 +617,10 @@ async function handleCompleteTask() {
     showToast(err.message, "error");
   } finally {
     clearButtonLoading(elements.btnReport);
-    // 送信ボタンの disabled は入力欄の状態で再判定
-    elements.btnReport.disabled = elements.appUrlInput.value.trim().length === 0;
+    // 送信ボタンの disabled は「URL あり AND 氏名あり」で再判定
+    const hasUrl  = elements.appUrlInput.value.trim().length > 0;
+    const hasName = state.name.trim() !== "";
+    elements.btnReport.disabled = !hasUrl || !hasName;
   }
 }
 
@@ -555,15 +633,18 @@ async function handleCompleteTask() {
  * init() から呼ばれる
  */
 function registerEventListeners() {
+  // 氏名入力欄: 入力のたびにボタン状態を更新
+  elements.nameInput.addEventListener("input", handleNameInput);
+
   // 打刻ボタン
   elements.btnClockIn.addEventListener("click",  handleClockIn);
   elements.btnClockOut.addEventListener("click", handleClockOut);
 
   // アプリURL入力欄: 入力のたびにカウンターとボタン状態を更新
-  elements.appUrlInput.addEventListener("input", handleAppUrlInput); // 旧: handleTaskInput
+  elements.appUrlInput.addEventListener("input", handleAppUrlInput);
 
   // 課題完了報告の送信ボタン
-  elements.btnReport.addEventListener("click", handleCompleteTask); // 旧: handleReport
+  elements.btnReport.addEventListener("click", handleCompleteTask);
 }
 
 /* ============================================================
@@ -575,23 +656,27 @@ function registerEventListeners() {
  * アプリの初期化処理
  */
 function init() {
-  // 1. localStorage から当日の状態を復元
+  // 1. localStorage から当日の打刻状態を復元
   loadState();
 
-  // 2. 日付をヘッダーに表示
+  // 2. localStorage から氏名を復元して state と入力欄に反映
+  state.name = loadName();
+  renderNameInput();
+
+  // 3. 日付をヘッダーに表示
   renderDate();
 
-  // 3. 復元した state で UI を初期描画
+  // 4. 復元した state で UI を初期描画
   updateUI();
 
-  // 4. 現在時刻を即時描画 + 1 秒ごとに更新
+  // 5. 現在時刻を即時描画 + 1 秒ごとに更新
   updateClock();
   setInterval(updateClock, 1000);
 
-  // 5. イベントリスナーを登録
+  // 6. イベントリスナーを登録
   registerEventListeners();
 
-  // 6. Service Worker を登録 (PWA 対応)
+  // 7. Service Worker を登録 (PWA 対応)
   registerServiceWorker();
 }
 

@@ -63,16 +63,33 @@
         </div>
       </section>
 
+      <!-- ---- 氏名入力エリア（新規追加） ----
+           時計の下・出勤ボタンの上に配置する。
+           氏名が入力されていないと出勤・退勤・送信ボタンを押せない。 -->
+      <section class="name-area" aria-label="氏名入力">
+        <label class="name-area__label" for="js-name-input">氏名</label>
+        <input
+          type="text"
+          class="name-area__input"
+          id="js-name-input"
+          maxlength="50"
+          placeholder="氏名を入力してください"
+          autocomplete="name"
+        />
+      </section>
+
       <!-- ---- 打刻ボタンエリア ---- -->
       <section class="punch-area" aria-label="打刻操作">
 
         <!-- 出勤ボタン
-             ・初期状態: 有効 (緑色)
-             ・出勤打刻後: disabled で操作不可 (グレー) -->
+             ・氏名未入力: 無効 (グレー)
+             ・氏名入力済み・未打刻: 有効 (緑色)
+             ・出勤打刻後: 無効 (グレー) -->
         <button
           class="btn btn--in"
           id="js-btn-clock-in"
           type="button"
+          disabled
         >
           <!-- ローディング中に表示するスピナー (初期は非表示) -->
           <span class="btn__spinner hidden" aria-hidden="true"></span>
@@ -80,9 +97,8 @@
         </button>
 
         <!-- 退勤ボタン
-             ・初期状態: disabled (グレー) — 出勤前は押せない
-             ・出勤後・退勤前: 有効 (赤色)
-             ・退勤後: disabled (グレー) -->
+             ・氏名未入力 / 出勤前 / 退勤後: 無効 (グレー)
+             ・出勤後・退勤前: 有効 (赤色) -->
         <button
           class="btn btn--out"
           id="js-btn-clock-out"
@@ -100,7 +116,7 @@
         <h2 class="report-area__heading">課題完了報告</h2>
 
         <label class="report-area__label" for="js-task-input">
-          完了した課題を入力してください
+          提出するアプリの URL を入力してください
         </label>
 
         <!-- テキストエリア
@@ -111,7 +127,7 @@
           id="js-task-input"
           maxlength="200"
           rows="4"
-          placeholder="例: ○○機能の実装を完了しました"
+          placeholder="例: https://your-name.github.io/my-app/"
         ></textarea>
 
         <!-- 残り文字数カウンター -->
