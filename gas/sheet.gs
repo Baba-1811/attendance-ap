@@ -332,6 +332,37 @@ function getTodayStatusByName(spreadsheetId, name) {
 }
 
 /**
+ * 当日・同氏名の出勤記録が既に存在するかを確認する。
+ *
+ * appendAttendanceRow での二重出勤打刻防止に使う。
+ * 退勤済みかどうかは関係なく、「今日この名前で1行でも出勤行がある」かだけを返す。
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @param {string} name     氏名（trim済み）
+ * @param {string} todayStr 今日の日付 "YYYY/MM/DD"
+ * @returns {boolean}
+ */
+function hasClockInToday(sheet, name, todayStr) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+
+  // A〜C 列だけ取得すれば十分（日付と氏名だけ確認）
+  const values = sheet.getRange(2, 1, lastRow - 1, COL_NAME).getValues();
+
+  for (let i = 0; i < values.length; i++) {
+    const rawDate = values[i][COL_DATE - 1]; // String 化せず生の値で受け取る
+    const rowName = String(values[i][COL_NAME - 1]);
+
+    const rowDateStr = rawDate instanceof Date
+      ? formatDateJST(rawDate)
+      : String(rawDate).slice(0, 10).replace(/-/g, "/");
+
+    if (rowDateStr === todayStr && rowName === name) return true;
+  }
+  return false;
+}
+
+/**
  * 打刻記録シートに出勤レコードを新規追加（末尾に 1 行 append）する。
  *
  * clockIn（出勤打刻）のときに呼ばれる。
@@ -343,8 +374,15 @@ function getTodayStatusByName(spreadsheetId, name) {
  * @throws {Error} シート取得失敗時
  */
 function appendAttendanceRow(spreadsheetId, data, clockInDate) {
-  const sheet       = getSheet(spreadsheetId, SHEET_NAME_ATTENDANCE);
-  const todayStr    = formatDateJST(clockInDate);
+  const sheet    = getSheet(spreadsheetId, SHEET_NAME_ATTENDANCE);
+  const todayStr = formatDateJST(clockInDate);
+
+  // 当日・同氏名の出勤記録が既にある場合は二重打刻エラー
+  // （UI 側で防いでいるが、ページリロードや複数端末からの操作でも安全にする）
+  if (hasClockInToday(sheet, data.name.trim(), todayStr)) {
+    throw new Error("本日すでに出勤打刻済みです。退勤打刻を行ってください。");
+  }
+
   const clockInTime = formatTimeJST(clockInDate);
 
   // appendRow は最終行の次の行にデータを追加する
@@ -404,8 +442,13 @@ function updateAttendanceClockOut(spreadsheetId, data, clockOutDate) {
   }
 
   // E列（退勤時刻）と F列（勤務時間）を書き込む
+  //
+  // ※ workMinutes（数値）を setValue するとセルのフォーマット設定によって
+  //   #NUM! や時刻表示の誤りが起きる。
+  //   formatWorkDuration で "9時間0分" のような文字列に変換して書き込むことで
+  //   セルフォーマットに依存しない安全な値になる。
   sheet.getRange(targetRow, COL_CLOCK_OUT).setValue(clockOutTime);
-  sheet.getRange(targetRow, COL_WORK_MINUTES).setValue(workMinutes);
+  sheet.getRange(targetRow, COL_WORK_MINUTES).setValue(formatWorkDuration(workMinutes));
 
   return {
     clockInTime:  String(clockInTime),
