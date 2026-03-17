@@ -1,0 +1,400 @@
+/* ============================================================
+   style.css
+   スマホ向け (375px 基準) のスタイル定義
+   BEM 命名規則 (Block__Element--Modifier) を使用
+   ============================================================ */
+
+/* ============================================================
+   1. CSS カスタムプロパティ（変数）
+      色やサイズを一箇所で管理することで、後から変更しやすくする
+   ============================================================ */
+:root {
+  /* カラーパレット */
+  --color-primary:     #2196f3; /* ブルー: 汎用アクション */
+  --color-in:          #4caf50; /* グリーン: 出勤ボタン */
+  --color-out:         #f44336; /* レッド: 退勤ボタン */
+  --color-disabled:    #bdbdbd; /* グレー: 無効ボタン */
+  --color-report:      #ff9800; /* オレンジ: 課題報告ボタン */
+  --color-bg:          #f5f5f5; /* 背景色 */
+  --color-surface:     #ffffff; /* カードやセクションの背景 */
+  --color-text:        #212121; /* メインテキスト */
+  --color-text-sub:    #757575; /* サブテキスト */
+  --color-border:      #e0e0e0; /* ボーダー */
+
+  /* トーストの色 */
+  --color-toast-success: #4caf50;
+  --color-toast-error:   #f44336;
+  --color-toast-info:    #2196f3;
+
+  /* スペーシング */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+
+  /* ボーダーラジアス */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* シャドウ */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   2. リセット & 基本設定
+   ============================================================ */
+*,
+*::before,
+*::after {
+  /* box-sizing: border-box にすると padding/border が width に含まれて計算が楽になる */
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* フォントサイズの基準を 16px に統一 */
+  font-size: 16px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  /* スマホで最低画面幅を確保 */
+  min-height: 100dvh;
+  /* コンテンツが少ないときも縦方向に間延びしないよう flex で構成 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   3. ユーティリティクラス
+   ============================================================ */
+
+/* hidden クラスで要素を非表示にする。JS から toggle して使う */
+.hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   4. ヘッダー
+   ============================================================ */
+.header {
+  background-color: var(--color-primary);
+  color: #fff;
+  padding: var(--space-md) var(--space-lg);
+  /* 上部固定にせず通常フローに置く（コンテンツが少ないため固定不要） */
+  text-align: center;
+  /* iOS で上部セーフエリア（ノッチ）に食い込まないようにする */
+  padding-top: calc(var(--space-md) + env(safe-area-inset-top));
+}
+
+.header__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.header__date {
+  font-size: 0.85rem;
+  margin-top: var(--space-xs);
+  opacity: 0.9;
+}
+
+/* ============================================================
+   5. メインコンテンツ
+   ============================================================ */
+.main {
+  flex: 1; /* body の残りスペースを全部使う */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  /* 最大幅を決めて中央寄せにすることで、タブレットでも崩れにくくなる */
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   6. ステータスエリア
+   ============================================================ */
+.status-area {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+/* 現在時刻の大きな数字 */
+.status-area__clock {
+  font-size: 3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums; /* 数字の幅を統一してガタつかせない */
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+
+/* 出勤・退勤・勤務時間の行を横並びにする */
+.status-area__records {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+  flex-wrap: wrap; /* 画面が狭いときは折り返す */
+}
+
+/* 各レコードアイテム（ラベル + 値） */
+.record-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.record-item__label {
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.record-item__value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 色分け */
+.record-item--in  .record-item__value { color: var(--color-in); }
+.record-item--out .record-item__value { color: var(--color-out); }
+.record-item--duration .record-item__value { color: var(--color-primary); }
+
+/* ============================================================
+   7. 打刻ボタンエリア
+   ============================================================ */
+.punch-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 出勤・退勤を横並び 50:50 */
+  gap: var(--space-md);
+}
+
+/* ============================================================
+   8. ボタン共通スタイル
+   ============================================================ */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+
+  /* タップしやすい最低高さ 56px */
+  min-height: 56px;
+  padding: var(--space-sm) var(--space-md);
+
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fff;
+  cursor: pointer;
+
+  /* クリック時の浮き上がりアニメーション */
+  transition: transform 0.1s ease, opacity 0.2s ease, box-shadow 0.1s ease;
+
+  /* タップ時のハイライトを消す (スマホ) */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ボタンを押したときに少し沈み込む */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 無効状態 */
+.btn:disabled {
+  background-color: var(--color-disabled);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+/* 出勤ボタン (グリーン) */
+.btn--in {
+  background-color: var(--color-in);
+}
+
+/* 退勤ボタン (レッド) */
+.btn--out {
+  background-color: var(--color-out);
+}
+
+/* 課題報告送信ボタン (オレンジ) — 横幅いっぱい */
+.btn--report {
+  background-color: var(--color-report);
+  width: 100%;
+  margin-top: var(--space-sm);
+}
+
+/* ============================================================
+   9. ローディングスピナー
+      CSS アニメーションで円形のくるくる表示を実装する
+   ============================================================ */
+.btn__spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  /* flex-shrink: 0 で親要素が小さくても潰れない */
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   10. 課題完了報告エリア
+   ============================================================ */
+.report-area {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.report-area__heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.report-area__label {
+  font-size: 0.85rem;
+  color: var(--color-text-sub);
+}
+
+.report-area__textarea {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical; /* 縦方向のみリサイズ可能 */
+  line-height: 1.6;
+  color: var(--color-text);
+  transition: border-color 0.2s ease;
+}
+
+/* フォーカス時にボーダーを強調する */
+.report-area__textarea:focus {
+  outline: none;
+  border-color: var(--color-report);
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.15);
+}
+
+/* 残り文字数カウンター */
+.report-area__counter {
+  font-size: 0.8rem;
+  color: var(--color-text-sub);
+  text-align: right;
+}
+
+/* ============================================================
+   11. フッター
+   ============================================================ */
+.footer {
+  text-align: center;
+  padding: var(--space-md);
+  /* iOS でホームバーに食い込まないようにする */
+  padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom));
+}
+
+.footer__version {
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+}
+
+/* ============================================================
+   12. トースト通知
+      画面下部に固定表示し、3 秒後に JS で hidden クラスを付ける
+   ============================================================ */
+.toast {
+  position: fixed;
+  bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+
+  /* テキスト量に応じて幅を決める。最大は画面幅 - 余白 */
+  min-width: 200px;
+  max-width: calc(100vw - var(--space-xl) * 2);
+
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+
+  /* 表示/非表示のフェードアニメーション */
+  opacity: 1;
+  transition: opacity 0.3s ease;
+
+  /* 他の要素より手前に表示 */
+  z-index: 9999;
+
+  /* デフォルトはサクセス色 (JS でクラスを付け替える) */
+  background-color: var(--color-toast-success);
+}
+
+/* モディファイア: エラー */
+.toast--error {
+  background-color: var(--color-toast-error);
+}
+
+/* モディファイア: 情報 */
+.toast--info {
+  background-color: var(--color-toast-info);
+}
+
+/* hidden のときはフェードアウト状態にする */
+.toast.hidden {
+  display: block !important; /* hidden を上書き */
+  opacity: 0;
+  pointer-events: none; /* フェードアウト中はクリックを無効化 */
+}
+
+/* ============================================================
+   13. レスポンシブ対応
+      480px 以上の画面（タブレット等）では少し余裕を持たせる
+   ============================================================ */
+@media (min-width: 480px) {
+  .status-area__clock {
+    font-size: 3.5rem;
+  }
+
+  .btn {
+    min-height: 64px;
+    font-size: 1.2rem;
+  }
+}

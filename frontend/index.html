@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- スマホで画面幅にフィットさせる基本設定 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>勤怠システム</title>
+
+    <!-- PWA 用のマニフェストファイルを読み込む -->
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- iOS Safari でホーム画面追加したときのアイコン指定 -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+    <!-- スタイルシート読み込み -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <!-- ========================================
+         ヘッダー
+         ・アプリ名と今日の日付を表示する
+    ======================================== -->
+    <header class="header">
+      <h1 class="header__title">勤怠システム</h1>
+      <!-- JS で今日の日付を動的に書き込む -->
+      <p class="header__date" id="js-date"></p>
+    </header>
+
+    <!-- ========================================
+         メインコンテンツ
+    ======================================== -->
+    <main class="main">
+
+      <!-- ---- ステータスエリア ---- -->
+      <section class="status-area" aria-label="勤務状況">
+
+        <!-- 現在時刻: JS で 1 秒ごとに更新する -->
+        <p class="status-area__clock" id="js-clock">--:--:--</p>
+
+        <!-- 出勤・退勤・勤務時間の情報行 -->
+        <div class="status-area__records">
+
+          <!-- 出勤時刻: 出勤打刻後に表示する (初期は非表示) -->
+          <div class="record-item record-item--in hidden" id="js-record-in">
+            <span class="record-item__label">出勤</span>
+            <span class="record-item__value" id="js-clock-in-time">--:--</span>
+          </div>
+
+          <!-- 退勤時刻: 退勤打刻後に表示する (初期は非表示) -->
+          <div class="record-item record-item--out hidden" id="js-record-out">
+            <span class="record-item__label">退勤</span>
+            <span class="record-item__value" id="js-clock-out-time">--:--</span>
+          </div>
+
+          <!-- 勤務時間: 退勤打刻後に表示する (初期は非表示) -->
+          <div class="record-item record-item--duration hidden" id="js-record-duration">
+            <span class="record-item__label">勤務時間</span>
+            <span class="record-item__value" id="js-work-duration">-時間-分</span>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ---- 打刻ボタンエリア ---- -->
+      <section class="punch-area" aria-label="打刻操作">
+
+        <!-- 出勤ボタン
+             ・初期状態: 有効 (緑色)
+             ・出勤打刻後: disabled で操作不可 (グレー) -->
+        <button
+          class="btn btn--in"
+          id="js-btn-clock-in"
+          type="button"
+        >
+          <!-- ローディング中に表示するスピナー (初期は非表示) -->
+          <span class="btn__spinner hidden" aria-hidden="true"></span>
+          <span class="btn__label">出勤</span>
+        </button>
+
+        <!-- 退勤ボタン
+             ・初期状態: disabled (グレー) — 出勤前は押せない
+             ・出勤後・退勤前: 有効 (赤色)
+             ・退勤後: disabled (グレー) -->
+        <button
+          class="btn btn--out"
+          id="js-btn-clock-out"
+          type="button"
+          disabled
+        >
+          <span class="btn__spinner hidden" aria-hidden="true"></span>
+          <span class="btn__label">退勤</span>
+        </button>
+
+      </section>
+
+      <!-- ---- 課題完了報告エリア ---- -->
+      <section class="report-area" aria-label="課題完了報告">
+        <h2 class="report-area__heading">課題完了報告</h2>
+
+        <label class="report-area__label" for="js-task-input">
+          完了した課題を入力してください
+        </label>
+
+        <!-- テキストエリア
+             ・maxlength で 200 文字制限
+             ・入力があるときだけ送信ボタンを有効にする -->
+        <textarea
+          class="report-area__textarea"
+          id="js-task-input"
+          maxlength="200"
+          rows="4"
+          placeholder="例: ○○機能の実装を完了しました"
+        ></textarea>
+
+        <!-- 残り文字数カウンター -->
+        <p class="report-area__counter">
+          <span id="js-char-count">0</span> / 200
+        </p>
+
+        <!-- 送信ボタン: 初期は disabled -->
+        <button
+          class="btn btn--report"
+          id="js-btn-report"
+          type="button"
+          disabled
+        >
+          <span class="btn__spinner hidden" aria-hidden="true"></span>
+          <span class="btn__label">送信</span>
+        </button>
+
+      </section>
+
+    </main>
+
+    <!-- ========================================
+         フッター
+    ======================================== -->
+    <footer class="footer">
+      <p class="footer__version">v1.0.0</p>
+    </footer>
+
+    <!-- ========================================
+         トースト通知
+         ・画面下部に重ねて表示する (position: fixed)
+         ・JS でクラスを付け外しして表示/非表示を切り替える
+    ======================================== -->
+    <div class="toast hidden" id="js-toast" role="alert" aria-live="polite">
+      <span class="toast__message" id="js-toast-message"></span>
+    </div>
+
+    <!-- JavaScript 読み込み (body の末尾に置くことで DOM が確実に存在する) -->
+    <script src="app.js"></script>
+  </body>
+</html>
