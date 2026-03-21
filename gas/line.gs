@@ -84,7 +84,7 @@ function buildClockInMessage(info) {
   return [
     `【出勤】`,
     `${info.name}`,
-    `日時: ${info.todayStr} ${info.clockInTime}`,
+    `${info.todayStr} ${info.clockInTime}`,
   ].join("\n");
 }
 
@@ -104,8 +104,9 @@ function buildClockOutMessage(info) {
   return [
     `【退勤】`,
     `${info.name}`,
-    `出勤: ${info.clockInTime} → 退勤: ${info.clockOutTime}`,
-    `勤務時間: ${info.workDuration}`,
+    `出勤：${info.clockInTime}`,
+    `退勤：${info.clockOutTime}`,
+    `勤務：${info.workDuration}`,
   ].join("\n");
 }
 
@@ -125,9 +126,10 @@ function buildClockOutMessage(info) {
 function buildCompleteTaskMessage(info) {
   return [
     `【🎉課題完了報告🎉】`,
-    `研修生: ${info.name}（${info.employeeId}）`,
-    `完了: ${info.reportedAt}`,
-    `アプリURL: ${info.appUrl}`,
+    `研修生：${info.name}（${info.employeeId}）`,
+    `完了：${info.reportedAt}`,
+    `アプリURL:`,
+    `${info.appUrl}`,
     `確認をお願いします！`,
   ].join("\n");
 }

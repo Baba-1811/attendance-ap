@@ -13,7 +13,7 @@
  *   ファイルを更新したら v1 → v2 のようにインクリメントする
  */
 
-const CACHE_NAME = "attendance-app-v5"; // employeeId 自動採番・マスタ自動登録対応に合わせてバージョンアップ
+const CACHE_NAME = "attendance-app-v6"; // checkStatusFromServer の EMPLOYEE_ID バグ修正に合わせてバージョンアップ
 
 /**
  * キャッシュ対象のファイル一覧

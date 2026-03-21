@@ -540,9 +540,8 @@ async function checkStatusFromServer() {
 
   try {
     const result = await postToGAS({
-      action:     "getStatus",
-      employeeId: EMPLOYEE_ID,
-      name:       name,
+      action: "getStatus",
+      name:   name,
     });
 
     if (result.status === "ok") {
