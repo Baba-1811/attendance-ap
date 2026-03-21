@@ -146,12 +146,21 @@ function buildCompleteTaskMessage(info) {
  * @param {string} lineGroupId
  * @param {string} message
  */
+/**
+ * LINE 通知を送信し、成否を boolean で返す。
+ *
+ * 失敗しても例外は投げない。呼び出し元（Code.gs）が戻り値を見て
+ * レスポンスメッセージに「LINE通知失敗」を付加できる。
+ *
+ * @returns {boolean} 送信成功なら true、失敗なら false
+ */
 function notifyLine(lineToken, lineGroupId, message) {
   try {
     sendLineMessage(lineToken, lineGroupId, message);
-    Logger.log("LINE 通知送信成功: " + message.split("\n")[0]); // 1 行目だけログに残す
+    Logger.log("LINE 通知送信成功: " + message.split("\n")[0]);
+    return true;
   } catch (err) {
-    // 通知失敗はログに記録するが、例外を外へ投げない
     Logger.log("LINE 通知送信失敗: " + err.message);
+    return false;
   }
 }

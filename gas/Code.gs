@@ -108,9 +108,10 @@ function handleClockIn(body) {
     clockInTime: clockInTime,
     todayStr:    formatDateJST(clockInDate),
   });
-  notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineOk = notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineSuffix = lineOk ? "" : "（LINE通知は失敗しました。管理者に連絡してください）";
 
-  return createJsonResponse("ok", `出勤打刻を記録しました（${clockInTime}）`);
+  return createJsonResponse("ok", `出勤打刻を記録しました（${clockInTime}）${lineSuffix}`);
 }
 
 // =====================================================
@@ -152,11 +153,12 @@ function handleClockOut(body) {
     workDuration: result.workDuration,
     todayStr:     formatDateJST(clockOutDate),
   });
-  notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineOk = notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineSuffix = lineOk ? "" : "（LINE通知は失敗しました。管理者に連絡してください）";
 
   return createJsonResponse(
     "ok",
-    `退勤打刻を記録しました（${result.clockOutTime} / 勤務時間: ${result.workDuration}）`
+    `退勤打刻を記録しました（${result.clockOutTime} / 勤務時間: ${result.workDuration}）${lineSuffix}`
   );
 }
 
@@ -201,9 +203,10 @@ function handleCompleteTask(body) {
     appUrl:     body.appUrl.trim(),
     reportedAt: reportedAt,
   });
-  notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineOk = notifyLine(props.lineToken, props.lineGroupId, lineMessage);
+  const lineSuffix = lineOk ? "" : "（LINE通知は失敗しました。管理者に連絡してください）";
 
-  return createJsonResponse("ok", "課題完了報告を送信しました");
+  return createJsonResponse("ok", `課題完了報告を送信しました${lineSuffix}`);
 }
 
 // =====================================================

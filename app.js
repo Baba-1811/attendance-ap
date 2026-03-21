@@ -20,7 +20,7 @@
  * デプロイ後に発行される URL をここに貼り付ける
  * 例: "https://script.google.com/macros/s/XXXX/exec"
  */
-const GAS_URL = "https://script.google.com/macros/s/AKfycby0vl4KjbGTcDTmQBdw9i0xpLnNawgvKL1o2WU4fLYEGQQ6SGwQ4E_BDUCIWMgfGk8M/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycby1D8smgGPTEqYUJTe5RXzfRj7C07hER_ySFlKVmzP--581fLNAahgADiDItfFbhQ0qqw/exec";
 
 /**
  * 研修生 ID
@@ -540,8 +540,12 @@ async function checkStatusFromServer() {
       name:       name,
     });
 
-    if (result.status === "ok") {
-      state.clockIn  = result.clockInTime  || null;
+    if (result.status === "ok" && result.clockInTime !== null) {
+      // サーバーに今日のデータがある場合のみ state を上書きする。
+      // サーバーが clockInTime: null（未出勤）を返した場合は何もしない。
+      // 理由: GAS の日付比較が一時的に失敗した場合でも
+      //       localStorage の正しい打刻済みデータを消してしまわないようにするため。
+      state.clockIn  = result.clockInTime;
       state.clockOut = result.clockOutTime || null;
       saveState();
       updateUI();
