@@ -22,11 +22,8 @@
  */
 const GAS_URL = "https://script.google.com/macros/s/AKfycby1D8smgGPTEqYUJTe5RXzfRj7C07hER_ySFlKVmzP--581fLNAahgADiDItfFbhQ0qqw/exec";
 
-/**
- * 研修生 ID
- * GAS の研修生マスタシートの A列 (employeeId) と完全に一致させる必要がある。
- */
-const EMPLOYEE_ID = "user01";
+// ※ EMPLOYEE_ID は廃止。研修生IDは GAS 側で名前から自動解決・採番する。
+//   フロントエンドは氏名のみ送信し、GAS が研修生マスタを検索して ID を決定する。
 
 /**
  * fetch のタイムアウト時間 (ミリ秒)
@@ -84,15 +81,17 @@ const elements = {
 /**
  * アプリの状態を保持するオブジェクト
  * @type {{
- *   clockIn:  string | null,  出勤時刻 (HH:MM) または null
- *   clockOut: string | null,  退勤時刻 (HH:MM) または null
- *   name:     string,         氏名 (入力欄と同期する)
+ *   clockIn:    string | null,  出勤時刻 (HH:MM) または null
+ *   clockOut:   string | null,  退勤時刻 (HH:MM) または null
+ *   name:       string,         氏名 (入力欄と同期する)
+ *   employeeId: string | null,  研修生ID (GAS から取得。未取得の場合は null)
  * }}
  */
 let state = {
-  clockIn:  null,
-  clockOut: null,
-  name:     "",
+  clockIn:    null,
+  clockOut:   null,
+  name:       "",
+  employeeId: null, // GAS の研修生マスタから自動採番・解決される
 };
 
 /* ============================================================
@@ -123,10 +122,11 @@ function getTodayString() {
 function saveState() {
   try {
     const data = {
-      date:     getTodayString(),
-      name:     state.name,     // ← 氏名も一緒に保存する
-      clockIn:  state.clockIn,
-      clockOut: state.clockOut,
+      date:       getTodayString(),
+      name:       state.name,
+      employeeId: state.employeeId, // ← GAS から取得した研修生ID
+      clockIn:    state.clockIn,
+      clockOut:   state.clockOut,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -155,12 +155,13 @@ function loadState() {
     // 保存された日付と今日を比較し、違えば打刻状態はリセットする
     if (data.date !== getTodayString()) {
       localStorage.removeItem(STORAGE_KEY);
-      return; // clockIn / clockOut は初期値 null のまま
+      return; // clockIn / clockOut / employeeId は初期値のまま
     }
 
-    // 今日のデータがあれば打刻状態も復元する
-    state.clockIn  = data.clockIn  ?? null;
-    state.clockOut = data.clockOut ?? null;
+    // 今日のデータがあれば打刻状態と研修生IDも復元する
+    state.clockIn    = data.clockIn    ?? null;
+    state.clockOut   = data.clockOut   ?? null;
+    state.employeeId = data.employeeId ?? null;
   } catch (e) {
     console.warn("localStorage の読み込みに失敗しました:", e);
   }
@@ -437,11 +438,11 @@ async function handleClockIn() {
 
   try {
     // GAS へ送るデータを組み立てる
+    // ※ employeeId は GAS 側で名前から自動解決するため送らない
     const body = {
-      action:     "clockIn",
-      employeeId: EMPLOYEE_ID,
-      name:       name,            // 氏名入力欄から取得
-      timestamp:  getCurrentTimestamp(),
+      action:    "clockIn",
+      name:      name,
+      timestamp: getCurrentTimestamp(),
     };
 
     const result = await postToGAS(body);
@@ -452,6 +453,8 @@ async function handleClockIn() {
       saveState();
       updateUI();
       showToast(result.message, "success");
+      // GAS が採番した研修生IDを取得するためサーバー状態を再確認する
+      checkStatusFromServer();
     } else {
       // GAS 側のビジネスロジックエラー (例: すでに打刻済み / 研修生マスタ不一致)
       showToast(result.message, "error");
@@ -488,11 +491,11 @@ async function handleClockOut() {
   setButtonLoading(elements.btnClockOut);
 
   try {
+    // ※ employeeId は GAS 側で名前から自動解決するため送らない
     const body = {
-      action:     "clockOut",
-      employeeId: EMPLOYEE_ID,
-      name:       name,            // 氏名入力欄から取得
-      timestamp:  getCurrentTimestamp(),
+      action:    "clockOut",
+      name:      name,
+      timestamp: getCurrentTimestamp(),
     };
 
     const result = await postToGAS(body);
@@ -502,6 +505,8 @@ async function handleClockOut() {
       saveState();
       updateUI();
       showToast(result.message, "success");
+      // 研修生IDの同期のためサーバー状態を再確認する
+      checkStatusFromServer();
     } else {
       showToast(result.message, "error");
     }
@@ -540,13 +545,18 @@ async function checkStatusFromServer() {
       name:       name,
     });
 
-    if (result.status === "ok" && result.clockInTime !== null) {
-      // サーバーに今日のデータがある場合のみ state を上書きする。
-      // サーバーが clockInTime: null（未出勤）を返した場合は何もしない。
-      // 理由: GAS の日付比較が一時的に失敗した場合でも
-      //       localStorage の正しい打刻済みデータを消してしまわないようにするため。
-      state.clockIn  = result.clockInTime;
-      state.clockOut = result.clockOutTime || null;
+    if (result.status === "ok") {
+      // 打刻状態: サーバーにデータがある場合のみ上書きする。
+      // clockInTime: null（未出勤）のときは localStorage の値を保持する。
+      // 理由: GAS が一時的に行を見つけられなくても正しいデータを消さないようにするため。
+      if (result.clockInTime !== null) {
+        state.clockIn  = result.clockInTime;
+        state.clockOut = result.clockOutTime || null;
+      }
+      // 研修生ID: サーバーから取得できた場合のみ更新する（未登録者は null のまま）
+      if (result.employeeId) {
+        state.employeeId = result.employeeId;
+      }
       saveState();
       updateUI();
     }
@@ -579,12 +589,12 @@ function handleNameInput() {
 
   state.name = newName;
 
-  // 氏名が変わった かつ 打刻状態が残っている場合はリセットする
-  // （前の人の clockIn/clockOut を次の人に引き継がせない）
-  if (newName.trim() !== prevName.trim() &&
-      (state.clockIn !== null || state.clockOut !== null)) {
-    state.clockIn  = null;
-    state.clockOut = null;
+  // 氏名が変わったら前の人の打刻状態・研修生IDを必ずリセットする
+  // （別人の clockIn/clockOut/employeeId を引き継がせない）
+  if (newName.trim() !== prevName.trim()) {
+    state.clockIn    = null;
+    state.clockOut   = null;
+    state.employeeId = null;
   }
 
   saveState(); // name / clockIn / clockOut をまとめて保存
@@ -645,12 +655,12 @@ async function handleCompleteTask() {
 
   try {
     // GAS へ送るデータを組み立てる
+    // ※ employeeId は GAS 側で名前から自動解決するため送らない
     const body = {
-      action:     "completeTask",
-      employeeId: EMPLOYEE_ID,
-      name:       name,            // 氏名入力欄から取得
-      appUrl:     appUrl,
-      timestamp:  getCurrentTimestamp(),
+      action:    "completeTask",
+      name:      name,
+      appUrl:    appUrl,
+      timestamp: getCurrentTimestamp(),
     };
 
     const result = await postToGAS(body);

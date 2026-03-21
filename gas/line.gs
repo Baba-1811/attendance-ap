@@ -76,15 +76,15 @@ function sendLineMessage(lineToken, lineGroupId, message) {
  * @returns {string}
  *
  * 出力例:
- *   【出勤】山田 太郎
- *   日付: 2026/03/17
- *   出勤時刻: 09:00
+ *   【出勤】
+ *   山田 太郎
+ *   日時: 2026/03/17 09:00
  */
 function buildClockInMessage(info) {
   return [
-    `【出勤】${info.name}`,
-    `日付: ${info.todayStr}`,
-    `出勤時刻: ${info.clockInTime}`,
+    `【出勤】`,
+    `${info.name}`,
+    `日時: ${info.todayStr} ${info.clockInTime}`,
   ].join("\n");
 }
 
@@ -95,15 +95,15 @@ function buildClockInMessage(info) {
  * @returns {string}
  *
  * 出力例:
- *   【退勤】山田 太郎
- *   日付: 2026/03/17
+ *   【退勤】
+ *   山田 太郎
  *   出勤: 09:00 → 退勤: 18:00
  *   勤務時間: 9時間0分
  */
 function buildClockOutMessage(info) {
   return [
-    `【退勤】${info.name}`,
-    `日付: ${info.todayStr}`,
+    `【退勤】`,
+    `${info.name}`,
     `出勤: ${info.clockInTime} → 退勤: ${info.clockOutTime}`,
     `勤務時間: ${info.workDuration}`,
   ].join("\n");
@@ -112,20 +112,23 @@ function buildClockOutMessage(info) {
 /**
  * 課題完了報告通知のメッセージ文字列を組み立てて返す。
  *
- * @param {{ name: string, appUrl: string, reportedAt: string }} info
- *   ※ 旧: task（課題内容の文字列） → appUrl（アプリ URL）に変更
+ * @param {{ name: string, employeeId: string, appUrl: string, reportedAt: string }} info
  * @returns {string}
  *
  * 出力例:
- *   【課題完了】山田 太郎
- *   2026/03/17 17:55
- *   https://example.github.io/my-app/
+ *   【🎉課題完了報告🎉】
+ *   研修生: 山田 太郎（user03）
+ *   完了: 2026/03/17 17:55
+ *   アプリURL: https://example.github.io/my-app/
+ *   確認をお願いします！
  */
 function buildCompleteTaskMessage(info) {
   return [
-    `【課題完了】${info.name}`,
-    info.reportedAt,
-    info.appUrl,  // 旧: info.task
+    `【🎉課題完了報告🎉】`,
+    `研修生: ${info.name}（${info.employeeId}）`,
+    `完了: ${info.reportedAt}`,
+    `アプリURL: ${info.appUrl}`,
+    `確認をお願いします！`,
   ].join("\n");
 }
 

@@ -225,6 +225,127 @@ function updateTraineeStatus(spreadsheetId, employeeId, status) {
 }
 
 // =====================================================
+// 2b. 研修生マスタシートの操作（名前ベースの新設計）
+//
+// 設計方針:
+//   - フロントエンドは「氏名」だけ送信する
+//   - GAS 側が研修生マスタを名前で検索し、存在すれば既存IDを使う
+//   - 存在しなければ自動採番（user01, user02 ...）して新規登録する
+//   - 「同じ名前 = 同一人物」とみなす仕様（同名別人は今回スコープ外）
+// =====================================================
+
+/**
+ * 研修生マスタを氏名（B列）で検索してデータを返す。
+ * 見つからなければ null を返す（新規作成はしない）。
+ *
+ * getStatus アクションなど「存在確認のみ」の用途で使う。
+ * 新規登録まで行いたい場合は getOrCreateTrainee を使うこと。
+ *
+ * @param {string} spreadsheetId
+ * @param {string} name  氏名（trim 済み）
+ * @returns {{ id: string, name: string, status: string }|null}
+ */
+function findTraineeByName(spreadsheetId, name) {
+  const sheet   = getTraineeMasterSheet(spreadsheetId);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const values = sheet.getRange(2, 1, lastRow - 1, COL_MASTER_STATUS).getValues();
+  for (let i = 0; i < values.length; i++) {
+    const rowName = String(values[i][COL_MASTER_NAME - 1]).trim();
+    if (rowName === name) {
+      return {
+        id:     String(values[i][COL_MASTER_ID     - 1]),
+        name:   rowName,
+        status: String(values[i][COL_MASTER_STATUS - 1]),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * 研修生IDを自動採番して返す。
+ *
+ * 既存IDの最大番号 + 1 で生成するため、行を削除しても重複しない。
+ * 例: user01, user03 が存在する場合 → user04 を返す
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet  研修生マスタシート
+ * @returns {string}  例: "user01", "user02"
+ */
+function generateNextEmployeeId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return "user01";
+
+  const ids = sheet.getRange(2, COL_MASTER_ID, lastRow - 1, 1).getValues().flat();
+  let maxNum = 0;
+  ids.forEach(function(id) {
+    const match = String(id).match(/^user(\d+)$/);
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+  });
+  return "user" + String(maxNum + 1).padStart(2, "0");
+}
+
+/**
+ * 研修生マスタを氏名で検索し、未登録なら自動採番して新規追加する。
+ *
+ * 出勤・課題完了ボタン押下時に呼ばれる。
+ * 同じ名前が既に登録されていれば既存のIDとステータスを返す。
+ * 未登録なら新規行を追加してから返す（初期ステータス: 進行中）。
+ *
+ * ⚠️ 同じ名前は同一人物とみなす仕様。同名別人は区別できない。
+ *
+ * @param {string} spreadsheetId
+ * @param {string} name  氏名（trim 済み）
+ * @returns {{ id: string, name: string, status: string }}
+ */
+function getOrCreateTrainee(spreadsheetId, name) {
+  const existing = findTraineeByName(spreadsheetId, name);
+  if (existing) return existing;
+
+  const sheet = getTraineeMasterSheet(spreadsheetId);
+  const newId = generateNextEmployeeId(sheet);
+  sheet.appendRow([newId, name, "進行中"]);
+  Logger.log("[getOrCreateTrainee] 新規登録: id=" + newId + ", name=" + name);
+
+  return { id: newId, name: name, status: "進行中" };
+}
+
+/**
+ * 研修生マスタの指定した氏名のステータス（C列）を更新する。
+ *
+ * 課題完了時に「確認待ち」へ更新するために使う。
+ * 名前が見つからない場合はログに残すが、例外は投げない。
+ *
+ * @param {string} spreadsheetId
+ * @param {string} name    氏名（trim 済み）
+ * @param {string} status  新しいステータス 例: "確認待ち"
+ */
+function updateMasterStatus(spreadsheetId, name, status) {
+  try {
+    const sheet   = getTraineeMasterSheet(spreadsheetId);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("[updateMasterStatus] マスタが空のため更新できません");
+      return;
+    }
+
+    const values = sheet.getRange(2, 1, lastRow - 1, COL_MASTER_NAME).getValues();
+    for (let i = 0; i < values.length; i++) {
+      const rowName = String(values[i][COL_MASTER_NAME - 1]).trim();
+      if (rowName === name) {
+        sheet.getRange(i + 2, COL_MASTER_STATUS).setValue(status);
+        Logger.log("[updateMasterStatus] " + name + " → " + status);
+        return;
+      }
+    }
+    Logger.log("[updateMasterStatus] 氏名「" + name + "」が見つかりませんでした");
+  } catch (err) {
+    Logger.log("[updateMasterStatus] 更新失敗: " + err.message);
+  }
+}
+
+// =====================================================
 // 3. 打刻記録シートの操作
 // =====================================================
 
