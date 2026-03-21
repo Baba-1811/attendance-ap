@@ -378,9 +378,9 @@ function findTodayOpenAttendanceRow(sheet, name, todayStr) {
 
   for (let i = 0; i < values.length; i++) {
     const row         = values[i];
-    const rawDate     =        row[COL_DATE      - 1];  // A列: stringify 前に instanceof Date を確認する
-    const rowName     = String(row[COL_NAME      - 1]); // C列: 氏名で照合する
-    const rowClockOut =        row[COL_CLOCK_OUT - 1];  // E列
+    const rawDate     =               row[COL_DATE      - 1];  // A列: stringify 前に instanceof Date を確認する
+    const rowName     = String(row[COL_NAME      - 1]).trim(); // C列: 氏名で照合する（前後空白を除去）
+    const rowClockOut =               row[COL_CLOCK_OUT - 1];  // E列
 
     // Sheets の日付セルは Date オブジェクトを返すことがある。
     // 先に String() すると "Mon Mar 17 2026..." という非解析文字列になるため
@@ -425,7 +425,7 @@ function getTodayStatusByName(spreadsheetId, name) {
   for (let i = values.length - 1; i >= 0; i--) {
     const row     = values[i];
     const rowDate = row[COL_DATE - 1];
-    const rowName = String(row[COL_NAME - 1]);
+    const rowName = String(row[COL_NAME - 1]).trim();
 
     // 日付を文字列に統一して比較
     const rowDateStr = (rowDate instanceof Date)
@@ -472,7 +472,7 @@ function hasClockInToday(sheet, name, todayStr) {
 
   for (let i = 0; i < values.length; i++) {
     const rawDate = values[i][COL_DATE - 1]; // String 化せず生の値で受け取る
-    const rowName = String(values[i][COL_NAME - 1]);
+    const rowName = String(values[i][COL_NAME - 1]).trim();
 
     const rowDateStr = rawDate instanceof Date
       ? formatDateJST(rawDate)

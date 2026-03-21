@@ -28,6 +28,28 @@
  */
 
 // =====================================================
+// 0. doGet — デプロイ確認用（ブラウザで GAS URL を開いたとき呼ばれる）
+// =====================================================
+
+/**
+ * ブラウザで Web アプリ URL を開いたときに呼ばれる。
+ * このレスポンスが返れば「新しいコードが動いている」と確認できる。
+ *
+ * 確認方法: GAS_URL をブラウザで開く
+ *   → { "version": "3.0.0", "feature": "getOrCreateTrainee 対応済み" } が返れば OK
+ */
+function doGet(e) {
+  const payload = JSON.stringify({
+    version: "3.0.0",
+    feature: "getOrCreateTrainee 対応済み",
+    timestamp: new Date().toISOString(),
+  });
+  return ContentService
+    .createTextOutput(payload)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =====================================================
 // 1. doPost — メインルーター
 // =====================================================
 
